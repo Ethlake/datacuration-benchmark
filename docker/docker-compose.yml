@@ -1,0 +1,26 @@
+services:
+  benchmark:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: dcbench
+    stdin_open: true
+    tty: true
+    shm_size: "64gb"
+    ipc: host
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - PYTHONUNBUFFERED=1
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - /shared/hanze/pretrain:/shared/hanze/pretrain
+      - /shared/mllm-sft:/shared/mllm-sft
+      - /shared/hanze/dcbench_output:/shared/hanze/dcbench_output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
