@@ -1,65 +1,300 @@
-"""
-download.py
-Utility functions for downloading and extracting various datasets to (local) disk.
-"""
+# """
+# download.py
+# Utility functions for downloading and extracting various datasets to (local) disk.
+# """
  
+# import os
+# import shutil
+# from pathlib import Path
+# from typing import Dict, List, TypedDict
+# from zipfile import ZipFile
+ 
+# import requests
+# from PIL import Image
+# from rich.progress import BarColumn, DownloadColumn, MofNCompleteColumn, Progress, TextColumn, TransferSpeedColumn
+# from tqdm import tqdm
+ 
+# # from prismatic.overwatch import initialize_overwatch
+ 
+# # Initialize Overwatch =>> Wraps `logging.Logger`
+# # overwatch = initialize_overwatch(__name__)
+ 
+ 
+# # === Dataset Registry w/ Links ===
+# # fmt: off
+# DatasetComponent = TypedDict(
+#     "DatasetComponent",
+#     {"name": str, "extract": bool, "extract_type": str, "url": str, "do_rename": bool},
+#     total=False
+# )
+ 
+# DATASET_REGISTRY: Dict[str, List[DatasetComponent]] = {
+#     # === LLaVa v1.5 Dataset(s) ===
+ 
+#     # Note =>> This is the full suite of datasets included in the LLaVa 1.5 "finetuning" stage; all the LLaVa v1.5
+#     #          models are finetuned on this split. We use this dataset for all experiments in our paper.
+#     "llava-laion-cc-sbu-558k": [
+#         {
+#             "name": "chat.json",        # Contains the "chat" traces :: {"human" => <prompt>, "gpt" => <caption>}
+#             "extract": False,
+#             "url": "https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain/resolve/main/blip_laion_cc_sbu_558k.json",
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "images",           # Contains the LLaVa Processed Images (jpgs, 224x224 resolution)
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain/resolve/main/images.zip",
+#             "do_rename": False,
+#         }
+#     ],
+ 
+#     "llava-v1.5-instruct": [
+#         {
+#             "name": "llava_v1_5_mix665k.json",
+#             "extract": False,
+#             "url": (
+#                 "https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/resolve/main/llava_v1_5_mix665k.json"
+#             ),
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "coco/train2017",       # Visual Instruct Tuning images are all sourced from COCO Train 2017
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "http://images.cocodataset.org/zips/train2017.zip",
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "gqa/images",
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "https://downloads.cs.stanford.edu/nlp/data/gqa/images.zip",
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "ocr_vqa/images",
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "https://huggingface.co/datasets/qnguyen3/ocr_vqa/resolve/main/ocr_vqa.zip",
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "textvqa/train_images",
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "https://dl.fbaipublicfiles.com/textvqa/images/train_val_images.zip",
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "vg/VG_100K",
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "https://cs.stanford.edu/people/rak248/VG_100K_2/images.zip",
+#             "do_rename": True,
+#         },
+#         {
+#             "name": "vg/VG_100K_2",
+#             "extract": True,
+#             "extract_type": "directory",
+#             "url": "https://cs.stanford.edu/people/rak248/VG_100K_2/images2.zip",
+#             "do_rename": True,
+#         },
+#     ]
+# }
+# # fmt: on
+ 
+ 
+# def convert_to_jpg(image_dir: Path) -> None:
+#     """Handling for OCR-VQA Images specifically; iterates through directory, converts all GIFs/PNGs."""
+#     # overwatch.info(f"Converting all Images in `{image_dir}` to JPG")
+#     print(f"Converting all Images in `{image_dir}` to JPG")
+ 
+#     for image_fn in tqdm(list(image_dir.iterdir())):
+#         if image_fn.suffix in {".jpg", ".jpeg"} or (jpg_fn := image_dir / f"{image_fn.stem}.jpg").exists():
+#             continue
+ 
+#         if image_fn.suffix == ".gif":
+#             gif = Image.open(image_fn)
+#             gif.seek(0)
+#             gif.convert("RGB").save(jpg_fn)
+#         elif image_fn.suffix == ".png":
+#             Image.open(image_fn).convert("RGB").save(jpg_fn)
+#         else:
+#             raise ValueError(f"Unexpected image format `{image_fn.suffix}`")
+ 
+ 
+# def download_with_progress(url: str, download_dir: Path, chunk_size_bytes: int = 1024) -> Path:
+#     """Utility function for downloading files from the internet, with a handy Rich-based progress bar."""
+#     # overwatch.info(f"Downloading {(dest_path := download_dir / Path(url).name)} from `{url}`", ctx_level=1)
+#     print(f"Downloading {(dest_path := download_dir / Path(url).name)} from `{url}`")
+#     if dest_path.exists():
+#         return dest_path
+ 
+#     # Otherwise --> fire an HTTP Request, with `stream = True`
+#     response = requests.get(url, stream=True)
+ 
+#     # Download w/ Transfer-Aware Progress
+#     #   => Reference: https://github.com/Textualize/rich/blob/master/examples/downloader.py
+#     with Progress(
+#         TextColumn("[bold]{task.description} - {task.fields[fname]}"),
+#         BarColumn(bar_width=None),
+#         "[progress.percentage]{task.percentage:>3.1f}%",
+#         "•",
+#         DownloadColumn(),
+#         "•",
+#         TransferSpeedColumn(),
+#         transient=True,
+#     ) as dl_progress:
+#         dl_tid = dl_progress.add_task(
+#             "Downloading", fname=dest_path.name, total=int(response.headers.get("content-length", "None"))
+#         )
+#         with open(dest_path, "wb") as f:
+#             for data in response.iter_content(chunk_size=chunk_size_bytes):
+#                 dl_progress.advance(dl_tid, f.write(data))
+ 
+#     return dest_path
+ 
+ 
+# def extract_with_progress(archive_path: Path, download_dir: Path, extract_type: str, cleanup: bool = False) -> Path:
+#     """Utility function for extracting compressed archives, with a handy Rich-based progress bar."""
+#     assert archive_path.suffix == ".zip", "Only `.zip` compressed archives are supported for now!"
+#     # overwatch.info(f"Extracting {archive_path.name} to `{download_dir}`", ctx_level=1)
+#     print(f"Extracting {archive_path.name} to `{download_dir}`")
+ 
+#     # Extract w/ Progress
+#     with Progress(
+#         TextColumn("[bold]{task.description} - {task.fields[aname]}"),
+#         BarColumn(bar_width=None),
+#         "[progress.percentage]{task.percentage:>3.1f}%",
+#         "•",
+#         MofNCompleteColumn(),
+#         transient=True,
+#     ) as ext_progress:
+#         with ZipFile(archive_path) as zf:
+#             ext_tid = ext_progress.add_task("Extracting", aname=archive_path.name, total=len(members := zf.infolist()))
+#             extract_path = Path(zf.extract(members[0], download_dir))
+#             if extract_type == "file":
+#                 assert len(members) == 1, f"Archive `{archive_path}` with extract type `{extract_type} has > 1 member!"
+#             elif extract_type == "directory":
+#                 for member in members[1:]:
+#                     zf.extract(member, download_dir)
+#                     ext_progress.advance(ext_tid)
+#             else:
+#                 raise ValueError(f"Extract type `{extract_type}` for archive `{archive_path}` is not defined!")
+ 
+#     # Cleanup (if specified)
+#     if cleanup:
+#         archive_path.unlink()
+ 
+#     return extract_path
+ 
+# def download_extract(dataset_id: str, root_dir: Path) -> None:
+#     """Download all files for a given dataset (querying registry above), extracting archives if necessary."""
+#     os.makedirs(download_dir := root_dir / dataset_id, exist_ok=True)
+ 
+#     # 检查是否仅下载 "llava-v1.5-instruct" 数据集
+#     if dataset_id != "llava-v1.5-instruct":
+#         # overwatch.warning(f"Skipping download for dataset: {dataset_id}")
+#         print(f"Skipping download for dataset: {dataset_id}")
+#         return  # 只处理"llava-v1.5-instruct"数据集，其他跳过
+ 
+#     # 下载文件 => 单线程，带进度条
+#     dl_tasks = [d for d in DATASET_REGISTRY[dataset_id] if not (download_dir / d["name"]).exists()]
+#     for dl_task in dl_tasks:
+#         dl_path = download_with_progress(dl_task["url"], download_dir)
+ 
+#         # 解压文件（如果指定） --> 假设只有 `.zip` 格式
+#         if dl_task["extract"]:
+#             dl_path = extract_with_progress(dl_path, download_dir, dl_task["extract_type"])
+#             dl_path = dl_path.parent if dl_path.is_file() else dl_path
+ 
+#         # 重命名路径 --> dl_task["name"]
+#         if dl_task["do_rename"]:
+#             shutil.move(dl_path, download_dir / dl_task["name"])
+ 
+# if __name__ == '__main__':
+#     # 指定数据集ID和下载根目录
+#     dataset_id = "llava-v1.5-instruct"  # 这里可以修改为需要下载的具体数据集ID
+#     # root_dir = Path(__file__).resolve().parent
+#     # root_dir = Path("")  # 替换为本地存储路径
+ 
+#     # 执行下载和解压操作
+#     download_extract(dataset_id, root_dir)
+
+
+
+"""
+data.py
+
+Utility functions for downloading and extracting datasets to local disk.
+
+Usage:
+    python data.py --dataset-id llava-v1.5-instruct
+    python data.py --dataset-id llava-v1.5-instruct --root-dir /workspace/data
+"""
+
+import argparse
 import os
 import shutil
 from pathlib import Path
 from typing import Dict, List, TypedDict
 from zipfile import ZipFile
- 
+
 import requests
 from PIL import Image
-from rich.progress import BarColumn, DownloadColumn, MofNCompleteColumn, Progress, TextColumn, TransferSpeedColumn
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TransferSpeedColumn,
+)
 from tqdm import tqdm
- 
-# from prismatic.overwatch import initialize_overwatch
- 
-# Initialize Overwatch =>> Wraps `logging.Logger`
-# overwatch = initialize_overwatch(__name__)
- 
- 
+
+
 # === Dataset Registry w/ Links ===
-# fmt: off
 DatasetComponent = TypedDict(
     "DatasetComponent",
-    {"name": str, "extract": bool, "extract_type": str, "url": str, "do_rename": bool},
-    total=False
+    {
+        "name": str,
+        "extract": bool,
+        "extract_type": str,
+        "url": str,
+        "do_rename": bool,
+    },
+    total=False,
 )
- 
+
 DATASET_REGISTRY: Dict[str, List[DatasetComponent]] = {
     # === LLaVa v1.5 Dataset(s) ===
- 
-    # Note =>> This is the full suite of datasets included in the LLaVa 1.5 "finetuning" stage; all the LLaVa v1.5
-    #          models are finetuned on this split. We use this dataset for all experiments in our paper.
+
+    # Full suite of datasets included in the LLaVA 1.5 finetuning stage.
     "llava-laion-cc-sbu-558k": [
         {
-            "name": "chat.json",        # Contains the "chat" traces :: {"human" => <prompt>, "gpt" => <caption>}
+            "name": "chat.json",
             "extract": False,
             "url": "https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain/resolve/main/blip_laion_cc_sbu_558k.json",
             "do_rename": True,
         },
         {
-            "name": "images",           # Contains the LLaVa Processed Images (jpgs, 224x224 resolution)
+            "name": "images",
             "extract": True,
             "extract_type": "directory",
             "url": "https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain/resolve/main/images.zip",
             "do_rename": False,
-        }
+        },
     ],
- 
     "llava-v1.5-instruct": [
         {
             "name": "llava_v1_5_mix665k.json",
             "extract": False,
-            "url": (
-                "https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/resolve/main/llava_v1_5_mix665k.json"
-            ),
+            "url": "https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/resolve/main/llava_v1_5_mix665k.json",
             "do_rename": True,
         },
         {
-            "name": "coco/train2017",       # Visual Instruct Tuning images are all sourced from COCO Train 2017
+            "name": "coco/train2017",
             "extract": True,
             "extract_type": "directory",
             "url": "http://images.cocodataset.org/zips/train2017.zip",
@@ -100,42 +335,52 @@ DATASET_REGISTRY: Dict[str, List[DatasetComponent]] = {
             "url": "https://cs.stanford.edu/people/rak248/VG_100K_2/images2.zip",
             "do_rename": True,
         },
-    ]
+    ],
 }
-# fmt: on
- 
- 
+
+
 def convert_to_jpg(image_dir: Path) -> None:
-    """Handling for OCR-VQA Images specifically; iterates through directory, converts all GIFs/PNGs."""
-    # overwatch.info(f"Converting all Images in `{image_dir}` to JPG")
-    print(f"Converting all Images in `{image_dir}` to JPG")
- 
+    """Handling for OCR-VQA images specifically; converts GIF/PNG files to JPG."""
+    print(f"Converting all images in `{image_dir}` to JPG")
+
+    if not image_dir.exists():
+        raise FileNotFoundError(f"Image directory does not exist: {image_dir}")
+
     for image_fn in tqdm(list(image_dir.iterdir())):
-        if image_fn.suffix in {".jpg", ".jpeg"} or (jpg_fn := image_dir / f"{image_fn.stem}.jpg").exists():
+        if image_fn.suffix.lower() in {".jpg", ".jpeg"}:
             continue
- 
-        if image_fn.suffix == ".gif":
+
+        jpg_fn = image_dir / f"{image_fn.stem}.jpg"
+        if jpg_fn.exists():
+            continue
+
+        suffix = image_fn.suffix.lower()
+        if suffix == ".gif":
             gif = Image.open(image_fn)
             gif.seek(0)
             gif.convert("RGB").save(jpg_fn)
-        elif image_fn.suffix == ".png":
+        elif suffix == ".png":
             Image.open(image_fn).convert("RGB").save(jpg_fn)
         else:
-            raise ValueError(f"Unexpected image format `{image_fn.suffix}`")
- 
- 
+            raise ValueError(f"Unexpected image format `{image_fn.suffix}` in {image_fn}")
+
+
 def download_with_progress(url: str, download_dir: Path, chunk_size_bytes: int = 1024) -> Path:
-    """Utility function for downloading files from the internet, with a handy Rich-based progress bar."""
-    # overwatch.info(f"Downloading {(dest_path := download_dir / Path(url).name)} from `{url}`", ctx_level=1)
-    print(f"Downloading {(dest_path := download_dir / Path(url).name)} from `{url}`")
+    """Download a file from URL into download_dir with a progress bar."""
+    download_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = download_dir / Path(url).name
+
+    print(f"Downloading `{dest_path}` from `{url}`")
     if dest_path.exists():
+        print(f"File already exists, skipping download: {dest_path}")
         return dest_path
- 
-    # Otherwise --> fire an HTTP Request, with `stream = True`
-    response = requests.get(url, stream=True)
- 
-    # Download w/ Transfer-Aware Progress
-    #   => Reference: https://github.com/Textualize/rich/blob/master/examples/downloader.py
+
+    response = requests.get(url, stream=True, timeout=60)
+    response.raise_for_status()
+
+    total_size = response.headers.get("content-length")
+    total_size_int = int(total_size) if total_size is not None else None
+
     with Progress(
         TextColumn("[bold]{task.description} - {task.fields[fname]}"),
         BarColumn(bar_width=None),
@@ -147,22 +392,27 @@ def download_with_progress(url: str, download_dir: Path, chunk_size_bytes: int =
         transient=True,
     ) as dl_progress:
         dl_tid = dl_progress.add_task(
-            "Downloading", fname=dest_path.name, total=int(response.headers.get("content-length", "None"))
+            "Downloading",
+            fname=dest_path.name,
+            total=total_size_int,
         )
         with open(dest_path, "wb") as f:
             for data in response.iter_content(chunk_size=chunk_size_bytes):
-                dl_progress.advance(dl_tid, f.write(data))
- 
+                if not data:
+                    continue
+                written = f.write(data)
+                dl_progress.advance(dl_tid, written)
+
     return dest_path
- 
- 
+
+
 def extract_with_progress(archive_path: Path, download_dir: Path, extract_type: str, cleanup: bool = False) -> Path:
-    """Utility function for extracting compressed archives, with a handy Rich-based progress bar."""
-    assert archive_path.suffix == ".zip", "Only `.zip` compressed archives are supported for now!"
-    # overwatch.info(f"Extracting {archive_path.name} to `{download_dir}`", ctx_level=1)
-    print(f"Extracting {archive_path.name} to `{download_dir}`")
- 
-    # Extract w/ Progress
+    """Extract a zip archive into download_dir with a progress bar."""
+    if archive_path.suffix.lower() != ".zip":
+        raise AssertionError("Only `.zip` compressed archives are supported for now!")
+
+    print(f"Extracting `{archive_path.name}` to `{download_dir}`")
+
     with Progress(
         TextColumn("[bold]{task.description} - {task.fields[aname]}"),
         BarColumn(bar_width=None),
@@ -172,51 +422,115 @@ def extract_with_progress(archive_path: Path, download_dir: Path, extract_type: 
         transient=True,
     ) as ext_progress:
         with ZipFile(archive_path) as zf:
-            ext_tid = ext_progress.add_task("Extracting", aname=archive_path.name, total=len(members := zf.infolist()))
-            extract_path = Path(zf.extract(members[0], download_dir))
+            members = zf.infolist()
+            ext_tid = ext_progress.add_task(
+                "Extracting",
+                aname=archive_path.name,
+                total=len(members),
+            )
+
+            if len(members) == 0:
+                raise ValueError(f"Archive is empty: {archive_path}")
+
+            first_member_path = Path(zf.extract(members[0], download_dir))
+            ext_progress.advance(ext_tid)
+
             if extract_type == "file":
-                assert len(members) == 1, f"Archive `{archive_path}` with extract type `{extract_type} has > 1 member!"
+                if len(members) != 1:
+                    raise AssertionError(
+                        f"Archive `{archive_path}` with extract type `{extract_type}` has > 1 member!"
+                    )
+                extract_path = first_member_path
             elif extract_type == "directory":
                 for member in members[1:]:
                     zf.extract(member, download_dir)
                     ext_progress.advance(ext_tid)
+                extract_path = first_member_path.parent if first_member_path.is_file() else first_member_path
             else:
                 raise ValueError(f"Extract type `{extract_type}` for archive `{archive_path}` is not defined!")
- 
-    # Cleanup (if specified)
+
     if cleanup:
         archive_path.unlink()
- 
+
     return extract_path
- 
-def download_extract(dataset_id: str, root_dir: Path) -> None:
-    """Download all files for a given dataset (querying registry above), extracting archives if necessary."""
-    os.makedirs(download_dir := root_dir / "download" / dataset_id, exist_ok=True)
- 
-    # 检查是否仅下载 "llava-v1.5-instruct" 数据集
-    if dataset_id != "llava-v1.5-instruct":
-        # overwatch.warning(f"Skipping download for dataset: {dataset_id}")
-        print(f"Skipping download for dataset: {dataset_id}")
-        return  # 只处理"llava-v1.5-instruct"数据集，其他跳过
- 
-    # 下载文件 => 单线程，带进度条
-    dl_tasks = [d for d in DATASET_REGISTRY[dataset_id] if not (download_dir / d["name"]).exists()]
-    for dl_task in dl_tasks:
-        dl_path = download_with_progress(dl_task["url"], download_dir)
- 
-        # 解压文件（如果指定） --> 假设只有 `.zip` 格式
-        if dl_task["extract"]:
-            dl_path = extract_with_progress(dl_path, download_dir, dl_task["extract_type"])
+
+
+def _ensure_dataset_exists(dataset_id: str) -> None:
+    if dataset_id not in DATASET_REGISTRY:
+        available = ", ".join(sorted(DATASET_REGISTRY.keys()))
+        raise ValueError(
+            f"Unknown dataset_id `{dataset_id}`. "
+            f"Available dataset_ids: {available}"
+        )
+
+
+def _target_path(download_dir: Path, component_name: str) -> Path:
+    return download_dir / component_name
+
+
+def download_extract(dataset_id: str, root_dir: Path) -> Path:
+    """
+    Download all files for a given dataset (from DATASET_REGISTRY), extract if necessary,
+    and return the dataset download directory.
+
+    Final download directory:
+        root_dir / "download" / dataset_id
+    """
+    _ensure_dataset_exists(dataset_id)
+
+    root_dir = Path(root_dir).resolve()
+    download_dir = root_dir / "download" / dataset_id
+    os.makedirs(download_dir, exist_ok=True)
+
+    print(f"Preparing dataset `{dataset_id}` in `{download_dir}`")
+
+    for component in DATASET_REGISTRY[dataset_id]:
+        target = _target_path(download_dir, component["name"])
+
+        if target.exists():
+            print(f"Component already exists, skipping: {target}")
+            continue
+
+        dl_path = download_with_progress(component["url"], download_dir)
+
+        if component.get("extract", False):
+            dl_path = extract_with_progress(dl_path, download_dir, component["extract_type"])
             dl_path = dl_path.parent if dl_path.is_file() else dl_path
- 
-        # 重命名路径 --> dl_task["name"]
-        if dl_task["do_rename"]:
-            shutil.move(dl_path, download_dir / dl_task["name"])
- 
-if __name__ == '__main__':
-    # 指定数据集ID和下载根目录
-    dataset_id = "llava-v1.5-instruct"  # 这里可以修改为需要下载的具体数据集ID
-    root_dir = Path("/shared/hanze/datasets")  # 替换为本地存储路径
- 
-    # 执行下载和解压操作
-    download_extract(dataset_id, root_dir)
+
+        if component.get("do_rename", False):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                print(f"Target already exists after extraction, skipping move: {target}")
+            else:
+                shutil.move(str(dl_path), str(target))
+
+    print(f"Finished preparing dataset `{dataset_id}` at `{download_dir}`")
+    return download_dir
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Download and extract registered datasets.")
+    parser.add_argument(
+        "--dataset-id",
+        type=str,
+        required=True,
+        help="Dataset ID from DATASET_REGISTRY, e.g. llava-v1.5-instruct",
+    )
+    parser.add_argument(
+        "--root-dir",
+        type=str,
+        default=str(Path(__file__).resolve().parent),
+        help="Root directory under which data will be placed. "
+        "Final path will be <root-dir>/download/<dataset-id>",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    dataset_id = args.dataset_id
+    root_dir = Path(args.root_dir).resolve()
+
+    final_dir = download_extract(dataset_id, root_dir)
+    print(f"\nDataset ready at: {final_dir}")

@@ -1,7 +1,7 @@
 from vlmeval.vlm import *
 from vlmeval.api import *
 from functools import partial
-
+import os
 PandaGPT_ROOT = None
 MiniGPT4_ROOT = None
 TransCore_ROOT = None
@@ -484,7 +484,13 @@ qwen_series = {
 }
 
 llava_series = {
-    "llava_v1.5_7b": partial(LLaVA, model_path="/shared/hanze/pretrain/llava-665k-ocrbench-wo-guidance"),
+    "llava_v1.5_7b": partial(
+        LLaVA,
+        model_path=os.environ.get(
+            "DCBENCH_EVAL_MODEL_PATH",
+            "/shared/hanze/pretrain/llava-665k-ocrbench-wo-guidance",
+        ),
+    ),
     "llava_v1.5_13b": partial(LLaVA, model_path="liuhaotian/llava-v1.5-13b"),
     "llava_v1_7b": partial(LLaVA, model_path=LLAVA_V1_7B_MODEL_PTH),
     "sharegpt4v_7b": partial(LLaVA, model_path="Lin-Chen/ShareGPT4V-7B"),
